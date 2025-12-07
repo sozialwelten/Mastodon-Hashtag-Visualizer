@@ -2,6 +2,10 @@
 
 Interaktives Visualisierungs-Tool zur Analyse der Verbindungen eines bestimmten Hashtags aus einem Mastodon-Archiv.
 
+## Screenshot
+
+![Screenshot](hashtaganalyzer.png)
+
 ## Features
 
 - **Visueller Netzwerk-Graph**: Zeigt Hashtags als vernetzte Knoten mit physikbasiertem Layout
