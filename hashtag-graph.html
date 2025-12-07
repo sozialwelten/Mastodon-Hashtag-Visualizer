@@ -1,0 +1,784 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mastodon Hashtag Network Visualizer [v1.33.7]</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Courier New', monospace;
+      background: #0a0a0a;
+      color: #00ff41;
+      overflow: hidden;
+      height: 100vh;
+    }
+
+    #app {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
+
+    #header {
+      background: #1a1a1a;
+      border-bottom: 2px solid #00ff41;
+      padding: 12px 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    #header h1 {
+      font-size: 20px;
+      font-weight: bold;
+      letter-spacing: 2px;
+    }
+
+    #stats {
+      font-size: 12px;
+      opacity: 0.8;
+    }
+
+    #controls {
+      background: #1a1a1a;
+      border-bottom: 1px solid #00ff41;
+      padding: 12px 16px;
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+      align-items: flex-end;
+    }
+
+    .control-group {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .control-group label {
+      font-size: 11px;
+      opacity: 0.7;
+    }
+
+    input[type="text"],
+    input[type="number"],
+    select {
+      background: #0a0a0a;
+      border: 1px solid #00ff41;
+      color: #00ff41;
+      padding: 8px 12px;
+      font-family: 'Courier New', monospace;
+      font-size: 14px;
+    }
+
+    input[type="text"] {
+      width: 250px;
+    }
+
+    input[type="number"] {
+      width: 80px;
+      text-align: center;
+    }
+
+    button {
+      background: #0a0a0a;
+      border: 1px solid #00ff41;
+      color: #00ff41;
+      padding: 8px 16px;
+      cursor: pointer;
+      font-family: 'Courier New', monospace;
+      font-size: 14px;
+      transition: background 0.2s;
+    }
+
+    button:hover:not(:disabled) {
+      background: #003311;
+    }
+
+    button:disabled {
+      opacity: 0.3;
+      cursor: not-allowed;
+    }
+
+    #execute-btn {
+      background: #00ff41;
+      color: #0a0a0a;
+      font-weight: bold;
+      padding: 8px 24px;
+    }
+
+    #execute-btn:hover:not(:disabled) {
+      background: #00dd33;
+    }
+
+    .btn-group {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    #canvas-container {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+    }
+
+    #canvas {
+      width: 100%;
+      height: 100%;
+      image-rendering: crisp-edges;
+    }
+
+    .overlay {
+      position: absolute;
+      background: rgba(0, 0, 0, 0.85);
+      border: 1px solid #00ff41;
+      padding: 12px;
+      font-size: 11px;
+    }
+
+    #status {
+      bottom: 16px;
+      left: 16px;
+    }
+
+    #legend {
+      top: 16px;
+      right: 16px;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 6px 0;
+    }
+
+    .legend-color {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+    }
+
+    .center-node {
+      background: #00ff00;
+    }
+
+    .connected-node {
+      background: #00dd88;
+    }
+
+    .legend-line {
+      width: 32px;
+      height: 2px;
+      background: #006600;
+      opacity: 0.5;
+    }
+
+    input[type="file"] {
+      display: none;
+    }
+
+    .file-label {
+      background: #0a0a0a;
+      border: 1px solid #00ff41;
+      color: #00ff41;
+      padding: 8px 16px;
+      cursor: pointer;
+      font-family: 'Courier New', monospace;
+      font-size: 14px;
+      display: inline-block;
+      transition: background 0.2s;
+    }
+
+    .file-label:hover {
+      background: #003311;
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div id="header">
+      <h1>⚡ MASTODON.HASHTAG.GRAPH.ANALYZER [v1.33.7]</h1>
+      <div id="stats">💾 <span id="post-count">NO DATA</span></div>
+    </div>
+
+    <div id="controls">
+      <div class="control-group">
+        <label>&gt; LOAD_ARCHIVE.JSON</label>
+        <label class="file-label" for="file-input">📤 UPLOAD</label>
+        <input type="file" id="file-input" accept=".json">
+      </div>
+
+      <div class="control-group" style="flex: 1; min-width: 200px;">
+        <label>&gt; QUERY_HASHTAG</label>
+        <input type="text" id="search-input" placeholder="hashtag">
+      </div>
+
+      <div class="control-group">
+        <label>&gt; MAX_POSTS</label>
+        <div class="btn-group">
+          <button id="decrease-btn">-</button>
+          <input type="number" id="max-posts" value="50" min="10" step="10">
+          <button id="increase-btn">+</button>
+        </div>
+      </div>
+
+      <div class="control-group">
+        <label>&gt; DEPTH_LEVEL</label>
+        <select id="depth-select">
+          <option value="1">1 (direct)</option>
+          <option value="2">2 (extended)</option>
+        </select>
+      </div>
+
+      <div class="control-group">
+        <button id="execute-btn">&gt;&gt; EXECUTE</button>
+      </div>
+    </div>
+
+    <div id="canvas-container">
+      <canvas id="canvas"></canvas>
+
+      <div id="status" class="overlay">
+        <div style="margin-bottom: 8px;">NODES: <span id="node-count">0</span></div>
+        <div style="margin-bottom: 8px;">EDGES: <span id="edge-count">0</span></div>
+        <div style="margin-bottom: 8px;">ZOOM: <span id="zoom-level">1.0x</span></div>
+        <div id="hover-info" style="color: #ffff00;"></div>
+      </div>
+
+      <div id="legend" class="overlay">
+        <div style="margin-bottom: 8px; font-weight: bold;">&gt; LEGEND</div>
+        <div class="legend-item">
+          <div class="legend-color center-node"></div>
+          <span>CENTER (NEON)</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-color connected-node"></div>
+          <span>CONNECTED (CYAN)</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-line"></div>
+          <span>RELATION</span>
+        </div>
+        <div style="margin-top: 8px; font-size: 10px; opacity: 0.7;">
+          SCROLL: Zoom<br>
+          DRAG NODE: Move<br>
+          DRAG BG: Pan
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let data = null;
+    let nodes = [];
+    let links = [];
+    let hoveredNode = null;
+    let animationId = null;
+    let animationFrames = 0;
+    let maxAnimationFrames = 360; // 6 Sekunden für noch bessere Verteilung
+    let draggedNode = null;
+    let isDragging = false;
+    let isPanning = false;
+    let panStartX = 0;
+    let panStartY = 0;
+    let zoomLevel = 1;
+    let panX = 0;
+    let panY = 0;
+
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const fileInput = document.getElementById('file-input');
+    const searchInput = document.getElementById('search-input');
+    const maxPostsInput = document.getElementById('max-posts');
+    const depthSelect = document.getElementById('depth-select');
+    const executeBtn = document.getElementById('execute-btn');
+    const decreaseBtn = document.getElementById('decrease-btn');
+    const increaseBtn = document.getElementById('increase-btn');
+
+    function resizeCanvas() {
+      const container = document.getElementById('canvas-container');
+      canvas.width = container.clientWidth;
+      canvas.height = container.clientHeight;
+      if (nodes.length > 0) {
+        render();
+      }
+    }
+
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
+
+    fileInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          try {
+            data = JSON.parse(event.target.result);
+            const postCount = data.orderedItems?.length || 0;
+            document.getElementById('post-count').textContent = `${postCount} POSTS`;
+          } catch (err) {
+            alert('Fehler beim Laden der JSON-Datei');
+          }
+        };
+        reader.readAsText(file);
+      }
+    });
+
+    decreaseBtn.addEventListener('click', () => {
+      maxPostsInput.value = Math.max(10, parseInt(maxPostsInput.value) - 10);
+    });
+
+    increaseBtn.addEventListener('click', () => {
+      maxPostsInput.value = parseInt(maxPostsInput.value) + 10;
+    });
+
+    executeBtn.addEventListener('click', buildGraph);
+
+    function buildGraph() {
+      if (!data || !searchInput.value) return;
+
+      if (animationId) {
+        cancelAnimationFrame(animationId);
+        animationId = null;
+      }
+
+      const posts = data.orderedItems || [];
+      const hashtag = searchInput.value.toLowerCase().replace('#', '');
+      const maxPosts = parseInt(maxPostsInput.value);
+      const depth = parseInt(depthSelect.value);
+
+      const relevantPosts = posts.filter(post => {
+        const obj = post.object || post;
+        const tags = obj.tag || [];
+        return tags.some(t => t.name && t.name.toLowerCase().replace('#', '') === hashtag);
+      }).slice(0, maxPosts);
+
+      if (relevantPosts.length === 0) {
+        nodes = [];
+        links = [];
+        updateStats();
+        ctx.fillStyle = '#0a0a0a';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        return;
+      }
+
+      const connections = new Map();
+      const hashtagCounts = new Map();
+
+      relevantPosts.forEach(post => {
+        const obj = post.object || post;
+        const tags = (obj.tag || [])
+          .filter(t => t.type === 'Hashtag' && t.name)
+          .map(t => t.name.toLowerCase().replace('#', ''));
+
+        tags.forEach(tag => {
+          hashtagCounts.set(tag, (hashtagCounts.get(tag) || 0) + 1);
+        });
+
+        tags.forEach(tag => {
+          if (tag !== hashtag) {
+            const key = `${hashtag}-${tag}`;
+            connections.set(key, (connections.get(key) || 0) + 1);
+          }
+        });
+
+        if (depth > 1) {
+          for (let i = 0; i < tags.length; i++) {
+            for (let j = i + 1; j < tags.length; j++) {
+              if (tags[i] !== hashtag && tags[j] !== hashtag) {
+                const key = [tags[i], tags[j]].sort().join('-');
+                connections.set(key, (connections.get(key) || 0) + 1);
+              }
+            }
+          }
+        }
+      });
+
+      nodes = [
+        {
+          id: hashtag,
+          label: `#${hashtag}`,
+          size: 20,
+          isCenter: true,
+          count: hashtagCounts.get(hashtag) || 0,
+          x: canvas.width / 2,
+          y: canvas.height / 2,
+          vx: 0,
+          vy: 0
+        }
+      ];
+
+      const connectedHashtagsArray = [];
+      connections.forEach((count, key) => {
+        const parts = key.split('-');
+        parts.forEach(tag => {
+          if (tag !== hashtag && !connectedHashtagsArray.find(t => t.tag === tag)) {
+            connectedHashtagsArray.push({
+              tag: tag,
+              count: hashtagCounts.get(tag) || 0
+            });
+          }
+        });
+      });
+
+      connectedHashtagsArray.sort((a, b) => b.count - a.count);
+      const topHashtags = connectedHashtagsArray.slice(0, maxPosts - 1);
+
+      let angle = 0;
+      const angleStep = (2 * Math.PI) / topHashtags.length;
+      const baseRadius = Math.min(canvas.width, canvas.height) * 0.5;
+      const minDistance = 180; // Noch viel größerer Mindestabstand
+
+      topHashtags.forEach((item, idx) => {
+        let x, y, attempts = 0;
+        let tooClose = true;
+
+        // Finde Position mit genug Abstand
+        while (tooClose && attempts < 200) {
+          const radiusVariation = (Math.random() - 0.5) * 350;
+          const radius = baseRadius + radiusVariation + (idx * 5); // Zusätzlicher Abstand pro Node
+
+          x = canvas.width / 2 + Math.cos(angle) * radius;
+          y = canvas.height / 2 + Math.sin(angle) * radius;
+
+          // Prüfe Abstand zu allen existierenden Nodes
+          tooClose = false;
+          for (let existing of nodes) {
+            const dx = x - existing.x;
+            const dy = y - existing.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist < minDistance) {
+              tooClose = true;
+              // Versuche größeren Radius und anderen Winkel
+              angle += (Math.random() - 0.5) * 0.5;
+              break;
+            }
+          }
+          attempts++;
+        }
+
+        nodes.push({
+          id: item.tag,
+          label: `#${item.tag}`,
+          size: 10 + Math.log(item.count || 1) * 2,
+          isCenter: false,
+          count: item.count,
+          x: x,
+          y: y,
+          vx: 0,
+          vy: 0
+        });
+        angle += angleStep + (Math.random() - 0.5) * 0.1; // Variiere Winkel
+      });
+
+      links = [];
+      connections.forEach((count, key) => {
+        const [source, target] = key.split('-');
+        if (nodes.find(n => n.id === source) && nodes.find(n => n.id === target)) {
+          links.push({ source, target, strength: count });
+        }
+      });
+
+      updateStats();
+      animationFrames = 0;
+      zoomLevel = 1;
+      panX = 0;
+      panY = 0;
+      animate();
+    }
+
+    function animate() {
+      if (animationFrames < maxAnimationFrames) {
+        const progress = animationFrames / maxAnimationFrames;
+        const alphaMultiplier = 1 - (progress * progress);
+        const alpha = 0.3 * alphaMultiplier;
+
+        const linkDistance = 300; // Sehr großer Zielabstand
+        const linkStrength = 0.005; // Sehr schwache Link-Kraft
+        const chargeStrength = -3000; // Sehr starke Abstoßung
+        const minNodeDistance = 150; // Sehr großer Mindestabstand während Animation
+
+        links.forEach(link => {
+          const source = nodes.find(n => n.id === link.source);
+          const target = nodes.find(n => n.id === link.target);
+          if (!source || !target) return;
+
+          const dx = target.x - source.x;
+          const dy = target.y - source.y;
+          const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+          const force = (dist - linkDistance) * linkStrength;
+
+          const fx = (dx / dist) * force;
+          const fy = (dy / dist) * force;
+
+          if (!source.isCenter && source !== draggedNode) {
+            source.vx += fx;
+            source.vy += fy;
+          }
+          if (!target.isCenter && target !== draggedNode) {
+            target.vx -= fx;
+            target.vy -= fy;
+          }
+        });
+
+        for (let i = 0; i < nodes.length; i++) {
+          for (let j = i + 1; j < nodes.length; j++) {
+            const dx = nodes[j].x - nodes[i].x;
+            const dy = nodes[j].y - nodes[i].y;
+            const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+            const force = chargeStrength / (dist * dist);
+
+            const fx = (dx / dist) * force;
+            const fy = (dy / dist) * force;
+
+            if (!nodes[i].isCenter && nodes[i] !== draggedNode) {
+              nodes[i].vx -= fx;
+              nodes[i].vy -= fy;
+            }
+            if (!nodes[j].isCenter && nodes[j] !== draggedNode) {
+              nodes[j].vx += fx;
+              nodes[j].vy += fy;
+            }
+          }
+        }
+
+        nodes.forEach(node => {
+          if (!node.isCenter && node !== draggedNode) {
+            const damping = 0.90 + (progress * 0.08); // Noch langsameres Auslaufen
+            node.vx *= damping;
+            node.vy *= damping;
+            node.x += node.vx * alpha;
+            node.y += node.vy * alpha;
+
+            node.x = Math.max(150, Math.min(canvas.width - 150, node.x));
+            node.y = Math.max(150, Math.min(canvas.height - 150, node.y));
+          }
+        });
+
+        animationFrames++;
+      }
+
+      render();
+
+      if (animationFrames < maxAnimationFrames || isDragging) {
+        animationId = requestAnimationFrame(animate);
+      }
+    }
+
+    function render() {
+      ctx.fillStyle = '#0a0a0a';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      if (nodes.length === 0) return;
+
+      ctx.save();
+      ctx.translate(canvas.width / 2 + panX, canvas.height / 2 + panY);
+      ctx.scale(zoomLevel, zoomLevel);
+      ctx.translate(-canvas.width / 2, -canvas.height / 2);
+
+      // Links - dunkelgrün
+      ctx.strokeStyle = '#00aa33';
+      ctx.globalAlpha = 0.3;
+      links.forEach(link => {
+        const source = nodes.find(n => n.id === link.source);
+        const target = nodes.find(n => n.id === link.target);
+        if (!source || !target) return;
+
+        ctx.lineWidth = Math.log(link.strength + 1) * 1.5;
+        ctx.beginPath();
+        ctx.moveTo(source.x, source.y);
+        ctx.lineTo(target.x, target.y);
+        ctx.stroke();
+      });
+
+      // Nodes
+      ctx.globalAlpha = 1;
+      nodes.forEach(node => {
+        const isHovered = hoveredNode === node.id;
+
+        // Glow für Zentrum
+        if (node.isCenter) {
+          const gradient = ctx.createRadialGradient(node.x, node.y, 0, node.x, node.y, node.size + 15);
+          gradient.addColorStop(0, '#00ff41');
+          gradient.addColorStop(0.5, 'rgba(0, 255, 65, 0.5)');
+          gradient.addColorStop(1, 'rgba(0, 255, 65, 0)');
+          ctx.fillStyle = gradient;
+          ctx.beginPath();
+          ctx.arc(node.x, node.y, node.size + 15, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        // Node circle - CCC Farbschema
+        if (node.isCenter) {
+          ctx.fillStyle = '#00ff41'; // Neon-Grün für Zentrum
+        } else if (isHovered) {
+          ctx.fillStyle = '#ff00ff'; // Magenta für Hover
+        } else {
+          ctx.fillStyle = '#00dd88'; // Türkis/Cyan für normale Nodes
+        }
+
+        ctx.beginPath();
+        ctx.arc(node.x, node.y, node.size, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Border - dezent
+        ctx.strokeStyle = node.isCenter ? '#00ff41' : (isHovered ? '#ff00ff' : '#00ffaa');
+        ctx.lineWidth = node.isCenter ? 3 : 1.5;
+        ctx.stroke();
+
+        // Label
+        const label = node.label;
+        ctx.font = node.isCenter ? 'bold 16px monospace' : 'bold 13px monospace';
+        ctx.textAlign = 'center';
+
+        const textY = node.y + node.size + 24;
+        const metrics = ctx.measureText(label);
+        const textWidth = metrics.width;
+
+        // Schwarzer Hintergrund
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
+        ctx.fillRect(node.x - textWidth / 2 - 8, textY - 15, textWidth + 16, 22);
+
+        // Text - einheitliches helles Grün/Cyan
+        ctx.fillStyle = node.isCenter ? '#00ff41' : '#00ffcc';
+        ctx.fillText(label, node.x, textY);
+
+        // Count
+        if (isHovered || node.isCenter) {
+          ctx.font = 'bold 11px monospace';
+          const countText = `${node.count}x`;
+          const countMetrics = ctx.measureText(countText);
+          const countY = textY + 18;
+
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
+          ctx.fillRect(node.x - countMetrics.width / 2 - 6, countY - 13, countMetrics.width + 12, 20);
+
+          ctx.fillStyle = '#ffff00';
+          ctx.fillText(countText, node.x, countY);
+        }
+      });
+
+      ctx.restore();
+    }
+
+    canvas.addEventListener('mousedown', (e) => {
+      const rect = canvas.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+      const x = (mouseX - canvas.width / 2 - panX) / zoomLevel + canvas.width / 2;
+      const y = (mouseY - canvas.height / 2 - panY) / zoomLevel + canvas.height / 2;
+
+      // Prüfe ob ein Node getroffen wurde
+      let nodeClicked = false;
+      nodes.forEach(node => {
+        const dist = Math.sqrt((x - node.x) ** 2 + (y - node.y) ** 2);
+        if (dist < node.size + 5) {
+          draggedNode = node;
+          isDragging = true;
+          nodeClicked = true;
+          canvas.style.cursor = 'grabbing';
+          if (animationFrames >= maxAnimationFrames) {
+            animate();
+          }
+        }
+      });
+
+      // Wenn kein Node getroffen, starte Panning
+      if (!nodeClicked) {
+        isPanning = true;
+        panStartX = mouseX - panX;
+        panStartY = mouseY - panY;
+        canvas.style.cursor = 'move';
+      }
+    });
+
+    canvas.addEventListener('mousemove', (e) => {
+      const rect = canvas.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+
+      // Panning
+      if (isPanning) {
+        panX = mouseX - panStartX;
+        panY = mouseY - panStartY;
+        render();
+        return;
+      }
+
+      const x = (mouseX - canvas.width / 2 - panX) / zoomLevel + canvas.width / 2;
+      const y = (mouseY - canvas.height / 2 - panY) / zoomLevel + canvas.height / 2;
+
+      // Node dragging
+      if (isDragging && draggedNode) {
+        draggedNode.x = x;
+        draggedNode.y = y;
+        draggedNode.vx = 0;
+        draggedNode.vy = 0;
+        return;
+      }
+
+      // Hover detection
+      let found = null;
+      nodes.forEach(node => {
+        const dist = Math.sqrt((x - node.x) ** 2 + (y - node.y) ** 2);
+        if (dist < node.size + 5) {
+          found = node.id;
+          canvas.style.cursor = 'grab';
+        }
+      });
+
+      if (!found && !isPanning) {
+        canvas.style.cursor = 'default';
+      }
+
+      if (hoveredNode !== found) {
+        hoveredNode = found;
+        const hoverInfo = document.getElementById('hover-info');
+        hoverInfo.textContent = found ? `HOVER: #${found}` : '';
+        if (animationFrames >= maxAnimationFrames && !isDragging) {
+          render();
+        }
+      }
+    });
+
+    canvas.addEventListener('mouseup', () => {
+      draggedNode = null;
+      isDragging = false;
+      isPanning = false;
+      canvas.style.cursor = 'default';
+    });
+
+    canvas.addEventListener('mouseleave', () => {
+      draggedNode = null;
+      isDragging = false;
+      isPanning = false;
+      canvas.style.cursor = 'default';
+    });
+
+    canvas.addEventListener('wheel', (e) => {
+      e.preventDefault();
+
+      const zoomSpeed = 0.1;
+      const delta = e.deltaY > 0 ? -zoomSpeed : zoomSpeed;
+      zoomLevel = Math.max(0.3, Math.min(3, zoomLevel + delta));
+
+      updateStats();
+      render();
+    });
+
+    function updateStats() {
+      document.getElementById('node-count').textContent = nodes.length;
+      document.getElementById('edge-count').textContent = links.length;
+      document.getElementById('zoom-level').textContent = zoomLevel.toFixed(1) + 'x';
+    }
+  </script>
+</body>
+</html>
